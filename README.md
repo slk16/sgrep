@@ -7,3 +7,5 @@
 int main()位于src/sgrep.cpp之中
 
 class sgrep{};位于include/sgrep.cpp
+
+运行build.sh来构建sgrep，输出文件位于test文件夹之中

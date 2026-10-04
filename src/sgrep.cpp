@@ -1,8 +1,5 @@
-#include <functional>
 #include <iostream>
-#include <functional>
 #include <stdexcept>
-#include <cstring>
 #include "sgrep.hpp"
 void run_grep(int argc, char* argv[]) {
     sgrep::Sgrep grep;
@@ -24,7 +21,7 @@ void run_grep(int argc, char* argv[]) {
             if (a == "-E")
                 state = expect_regex;
             else if (a == "-n")
-                grep.conf_.pmode_.set_flag(printMode::line_number);
+                grep.conf_.pmode_.set_flag(printMode::block_number);
             else if (state == expect_string && !ready) {
                 grep.conf_.pattern_.set_pattern(grepPatt::ByString);
                 grep.set_target(argv[i]);                
@@ -43,7 +40,7 @@ void run_grep(int argc, char* argv[]) {
         std::cout 
             << "sgrep [Options...] [Input] [Target]" << std::endl
             << "-E using the ECMAScript to search" << std::endl
-            << "-n to show the line number" << std::endl;
+            << "-n to show the block number" << std::endl;
     }
 }
 int main(int argc, char* argv[]) {

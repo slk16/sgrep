@@ -9,6 +9,8 @@
 #include <cstdint>
 #include <cstddef>
 #include <variant>
+#include <string_view>
+#include <iomanip>
 
 namespace sgrep{
     class sgrep_config_error : public std::runtime_error{
@@ -36,6 +38,16 @@ namespace sgrep{
                     constexpr static const char* Pink = "\033[1;35m";
                     constexpr static const char* Cyan = "\033[1;36m";
                     constexpr static const char* White = "\033[1;37m";
+                    
+                    constexpr static const char* thin_Grey = "\033[0;30m";
+                    constexpr static const char* thin_Red = "\033[0;31m";
+                    constexpr static const char* thin_Green = "\033[0;32m";
+                    constexpr static const char* thin_Yellow = "\033[0;33m";
+                    constexpr static const char* thin_Blue = "\033[0;34m";
+                    constexpr static const char* thin_Pink = "\033[0;35m";
+                    constexpr static const char* thin_Cyan = "\033[0;36m";
+                    constexpr static const char* thin_White = "\033[0;37m";
+
                     constexpr static const char* Reset = "\033[0m";
                 };
                 void set_begin_color(std::string color = Option::Red) noexcept {
@@ -114,22 +126,22 @@ namespace sgrep{
             class PrintMode{
             public:
                 struct Option {
-                    static constexpr std::uint64_t mode_default =     0x0000'0000'0000'0001;
-                    static constexpr std::uint64_t line_number =      0x0000'0000'0000'0002;
-                    static constexpr std::uint64_t file_name =        0x0000'0000'0000'0004;
+                    static constexpr std::uint64_t mode_default =     0x0000'0000'0000'0000;
+                    static constexpr std::uint64_t block_number =      0x0000'0000'0000'0001;
+                    static constexpr std::uint64_t file_name =        0x0000'0000'0000'0002;
                 };
                 bool have_flag(std::uint64_t mode) noexcept {
                     return static_cast<bool>((this->mode_ & mode) == mode);
                 }
-                void set_flag(std::uint64_t mode) {
-                    //使用set_mode后需要手动设置相应的optional，设置完将valid_设置为true
-                    this->mode_ &= mode;
-                    valid_ = false;
+                void set_flag(std::uint64_t mode) noexcept {
+                    this->mode_ |= mode;
+                }
+                void reset_flag() noexcept {
+                    this->mode_ = Option::mode_default; 
                 }
                 std::uint64_t mode_ = Option::mode_default;
-                std::optional<std::vector<std::size_t>> line_number_;
+                std::optional<std::vector<std::size_t>> block_number_;
                 std::optional<std::string> file_name_;
-                bool valid_ = true;
             };
             Color color_;
             Ios ios_;
@@ -155,14 +167,6 @@ namespace sgrep{
         };
     public:
 
-        int get_line_num() {
-            static int flag= -1;                         
-            if (-1 == flag) {
-                
-            } else {
-                return flag;
-            }
-        }
         void print_block(Matches const& match) {
             using Mode = sgrep::Sgrep::Config::PrintMode::Option;
             std::ostream& out = this->conf_.ios_.get_outs().get();
@@ -180,14 +184,26 @@ namespace sgrep{
             out << match.block_.substr(before);
         }
         void print_modifier() {
-            using printOption = sgrep::Sgrep::Config::PrintMode::Option;
-            if (this->conf_.pmode_.have_flag(printOption::file_name)) {
-                if (this->conf_.pmode_.valid_)
+            using PrintOption = sgrep::Sgrep::Config::PrintMode::Option;
+            if (this->conf_.pmode_.have_flag(PrintOption::file_name)) {
+                if (this->conf_.pmode_.file_name_.has_value())
                     std::cout << "File_name : " << this->conf_.pmode_.file_name_.value() << std::endl;
             }            
         }
         void print_prefix(std::size_t i) {
-            using printOption = sgrep::Sgrep::Config::PrintMode::Option;
+            using PrintColor = Sgrep::Config::Color::Option;
+            using PrintOption = sgrep::Sgrep::Config::PrintMode::Option;
+            if (this->conf_.pmode_.have_flag(PrintOption::block_number)) {
+                std::size_t size = std::string_view{std::to_string(this->results_.size())}.size();
+                if (this->conf_.pmode_.block_number_.has_value())
+                    std::cout
+                        << std::left 
+                        << std::setw(size) 
+                        << PrintColor::thin_Green
+                        << this->conf_.pmode_.block_number_.value()[i] 
+                        << PrintColor::Reset
+                        << " : ";
+            }
         }
         void print() {
             this->print_modifier();
@@ -224,13 +240,23 @@ namespace sgrep{
             return ret;
         }
         void handle() {
+            using PrintOption = sgrep::Sgrep::Config::PrintMode::Option;
             std::string block;
             std::vector<std::pair<std::size_t, std::size_t>> matches;
+            std::size_t block_nu = 1;
             while (this->read(block)){
                 matches = this->handle_block(block);
-                if (!matches.empty())
+                if (!matches.empty()) {
+                    if (this->conf_.pmode_.have_flag(PrintOption::block_number)) {
+                    if (!this->conf_.pmode_.block_number_.has_value())
+                        this->conf_.pmode_.block_number_.emplace();
+                    this->conf_.pmode_.block_number_.value().push_back(block_nu);
+                    }
                     this->results_.emplace_back(std::move(block), std::move(matches));
+                }
+                ++block_nu;
             }
+            using PrintOption = sgrep::Sgrep::Config::PrintMode::Option;
         }
         void run() {
             this->handle();

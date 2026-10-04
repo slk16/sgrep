@@ -41,8 +41,9 @@ void run_grep(int argc, char* argv[]) {
         grep.run();
     } else {
         std::cout 
-            << "sgrep [Options] ... [Target]" << std::endl
-            << "-E using the ECMAScript to search" << std::endl;
+            << "sgrep [Options...] [Input] [Target]" << std::endl
+            << "-E using the ECMAScript to search" << std::endl
+            << "-n to show the line number" << std::endl;
     }
 }
 int main(int argc, char* argv[]) {

@@ -118,10 +118,10 @@ namespace sgrep{
                     static constexpr std::uint64_t line_number =      0x0000'0000'0000'0002;
                     static constexpr std::uint64_t file_name =        0x0000'0000'0000'0004;
                 };
-                bool have_mode(std::uint64_t mode) noexcept {
+                bool have_flag(std::uint64_t mode) noexcept {
                     return static_cast<bool>((this->mode_ & mode) == mode);
                 }
-                void set_mode(std::uint64_t mode) {
+                void set_flag(std::uint64_t mode) {
                     //使用set_mode后需要手动设置相应的optional，设置完将valid_设置为true
                     this->mode_ &= mode;
                     valid_ = false;
@@ -140,13 +140,18 @@ namespace sgrep{
         class Matches { 
         public:
             std::string block_;
-            std::vector<std::pair<std::size_t, std::size_t>> target_;
+            std::vector<std::pair<std::size_t, std::size_t>> mark_;
             explicit Matches(std::string block,
                 std::vector<std::pair<std::size_t, std::size_t>> matchs) : 
                 block_(std::move(block)), 
-                target_(std::move(matchs)) {}
+                mark_(std::move(matchs)) {}
             Matches(Matches const& other) = delete;
             Matches& operator=(Matches const& other) = delete;
+            Matches(Matches &&other) {
+                this->block_ = std::move(other.block_); 
+                this->mark_= std::move(other.mark_);
+            }
+            Matches& operator=(Matches && other) = delete;
         };
     public:
 
@@ -161,37 +166,35 @@ namespace sgrep{
         void print_block(Matches const& match) {
             using Mode = sgrep::Sgrep::Config::PrintMode::Option;
             std::ostream& out = this->conf_.ios_.get_outs().get();
-            decltype (match.target_)::size_type before = 0;
-            for (   decltype(match.target_)::size_type i = 0;
-                    i < match.target_.size();
+            decltype (match.mark_)::size_type before = 0;
+            for (   decltype(match.mark_)::size_type i = 0;
+                    i < match.mark_.size();
                     ++i){
                 out
-                    << match.block_.substr(before, match.target_[i].first)
+                    << match.block_.substr(before, match.mark_[i].first)
                     << this->conf_.color_.get_begin_color()
-                    << match.block_.substr(match.target_[i].first, match.target_[i].second - match.target_[i].first)
+                    << match.block_.substr(match.mark_[i].first, match.mark_[i].second - match.mark_[i].first)
                     << this->conf_.color_.get_end_color();
-                before = match.target_[i].second;
+                before = match.mark_[i].second;
             }
             out << match.block_.substr(before);
         }
         void print_modifier() {
             using printOption = sgrep::Sgrep::Config::PrintMode::Option;
-            if (this->conf_.pmode_.have_mode(printOption::file_name)) {
+            if (this->conf_.pmode_.have_flag(printOption::file_name)) {
                 if (this->conf_.pmode_.valid_)
                     std::cout << "File_name : " << this->conf_.pmode_.file_name_.value() << std::endl;
             }            
         }
-        void print_prefix() {
+        void print_prefix(std::size_t i) {
             using printOption = sgrep::Sgrep::Config::PrintMode::Option;
-            if (this)
         }
         void print() {
             this->print_modifier();
-            for (   auto it = this->results_.begin();
-                    it != this->results_.end();
-                    ++it) {
-                this->print_prefix();
-                this->print_block(*it);
+            for (std::size_t i = 0; i < this->results_.size(); ++i) {
+                this->print_prefix(i);
+                this->print_block(this->results_[i]);
+                std::cout << std::endl;
             }
         }
         //sgrep
@@ -206,9 +209,9 @@ namespace sgrep{
         handle_block(std::string& block) {
             using GrepPatt = sgrep::Sgrep::Config::SearchPattern::Option;
             std::vector<std::pair<std::size_t, std::size_t>> ret;
-            std::string::size_type ind;
+            std::string::size_type ind = 0;
             if (this->conf_.pattern_.get_pattern() == GrepPatt::ByString) {
-                while (std::string::npos != (ind = block.find(this->get_target()))) {
+                while (std::string::npos != (ind = block.find(this->get_target(), ind + 1))) {
                     ret.emplace_back(ind, ind + this->get_target().size());
                 }
             } else { // ByRegex

@@ -11,6 +11,7 @@
 #include <variant>
 #include <string_view>
 #include <iomanip>
+#include <fstream>
 
 namespace sgrep{
     class sgrep_config_error : public std::runtime_error{
@@ -81,11 +82,13 @@ namespace sgrep{
             class Ios {
             public:
                 enum class ReadingOption {
+                    ByStdio,
                     ByFile
                 };
                 enum class ReadingPattern{
                     ByLine
                 };
+                // set io
                 void set_in(std::istream& in) noexcept {
                     ins_ = in;
                 }
@@ -98,6 +101,7 @@ namespace sgrep{
                 void reset_out() noexcept {
                     outs_ = std::cout; 
                 }
+                //get io
                 std::reference_wrapper<std::istream>
                 get_ins() const noexcept {
                     return this->ins_;
@@ -106,12 +110,21 @@ namespace sgrep{
                 get_outs() const noexcept {
                     return this->outs_;
                 }
-                void set_opt(ReadingPattern opt) {
-                    opt_ = opt;
+                //set /get reading option
+                void set_opt(ReadingOption opt) {
+                    this->opt_ = opt;
                 }
-                ReadingPattern get_opt() {
+                ReadingOption get_opt() {
                     return this->opt_;
                 }
+                //set / get reading pattern
+                void set_patt(ReadingPattern patt) {
+                    patt_ = patt;
+                }
+                ReadingPattern get_patt() {
+                    return this->patt_;
+                }
+                // set / get file_name
                 std::string const& get_file_name() {
                     return this->file_name_;
                 }
@@ -119,7 +132,8 @@ namespace sgrep{
                     this->file_name_ = file_name;
                 }
             private:
-                ReadingPattern opt_ = ReadingPattern::ByLine;
+                ReadingPattern patt_ = ReadingPattern::ByLine;
+                ReadingOption opt_ = ReadingOption::ByStdio;
                 std::string file_name_;
                 std::reference_wrapper<std::istream> ins_ = std::cin;
                 std::reference_wrapper<std::ostream> outs_ = std::cout;
@@ -232,7 +246,8 @@ namespace sgrep{
         //sgrep
         bool read(std::string& block) {
             using ReadingPattern = sgrep::Sgrep::Config::Ios::ReadingPattern;
-            if (this->conf_.ios_.get_opt() == ReadingPattern::ByLine) {
+            ReadingPattern pattern = this->conf_.ios_.get_patt();
+            if (pattern == ReadingPattern::ByLine) {
                 return static_cast<bool>(std::getline(this->conf_.ios_.get_ins().get(), block));           
             }
             return false;
@@ -255,18 +270,41 @@ namespace sgrep{
             }
             return ret;
         }
+        class ifstream_guard {
+        public:
+            explicit ifstream_guard(std::ifstream& ifs) :
+                ifs_(ifs) 
+            {}
+            ~ifstream_guard() {
+                ifs_.close();
+            }
+            ifstream_guard(const ifstream_guard& other) = delete;
+            ifstream_guard& operator=(const ifstream_guard& other) = delete;
+        private:
+            std::ifstream& ifs_;
+        };
         void handle() {
             using PrintOption = sgrep::Sgrep::Config::PrintMode::Option;
+            using ReadingOption = sgrep::Sgrep::Config::Ios::ReadingOption;
             std::string block;
             std::vector<std::pair<std::size_t, std::size_t>> matches;
             std::size_t block_nu = 1;
+            //设置读取方式
+            std::ifstream ifs;
+            ifstream_guard ifs_grd{ifs};
+            if (ReadingOption::ByStdio == this->conf_.ios_.get_opt()) {
+                this->conf_.ios_.set_in(std::cin);
+            } else if (ReadingOption::ByFile == this->conf_.ios_.get_opt()) {
+                ifs.open(this->conf_.ios_.get_file_name(), std::ios::in);
+                this->conf_.ios_.set_in(ifs);
+            }
             while (this->read(block)){
                 matches = this->handle_block(block);
                 if (!matches.empty()) {
                     if (this->conf_.pmode_.have_flag(PrintOption::block_number)) {
-                    if (!this->conf_.pmode_.block_number_.has_value())
-                        this->conf_.pmode_.block_number_.emplace();
-                    this->conf_.pmode_.block_number_.value().push_back(block_nu);
+                        if (!this->conf_.pmode_.block_number_.has_value())
+                            this->conf_.pmode_.block_number_.emplace();
+                        this->conf_.pmode_.block_number_.value().push_back(block_nu);
                     }
                     this->results_.emplace_back(std::move(block), std::move(matches));
                 }

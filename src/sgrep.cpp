@@ -5,6 +5,7 @@ void run_grep(int argc, char* argv[]) {
     sgrep::Sgrep grep;
     using grepPatt = sgrep::Sgrep::Config::SearchPattern::Option;
     using printMode = sgrep::Sgrep::Config::PrintMode::Option;
+    using ReadingOption = sgrep::Sgrep::Config::Ios::ReadingOption;
     grep.conf_.pattern_.set_pattern(grepPatt::ByRegex);
     constexpr std::uint32_t normal =            0x0000'0000'0000'0001;
     constexpr std::uint32_t expect_regex =      0x0000'0000'0000'0002;
@@ -21,6 +22,7 @@ void run_grep(int argc, char* argv[]) {
             else if (a == "-n")
                 grep.conf_.pmode_.set_flag(printMode::block_number);
             else if (a == "-f") {
+                grep.conf_.ios_.set_opt(ReadingOption::ByFile);
                 pre_state =  state;
                 state = expect_file_name;
             }

@@ -23,6 +23,12 @@ namespace sgrep{
 
         }
     };
+    inline void usage() {
+        std::cout 
+            << "sgrep [Options...] [Input] [Target]" << std::endl
+            << "-E using the ECMAScript to search" << std::endl
+            << "-n to show the block number" << std::endl;
+    }
     class Sgrep {
     public:
         struct Config {
@@ -74,7 +80,10 @@ namespace sgrep{
             };
             class Ios {
             public:
-                enum class Option {
+                enum class ReadingOption {
+                    ByFile
+                };
+                enum class ReadingPattern{
                     ByLine
                 };
                 void set_in(std::istream& in) noexcept {
@@ -97,14 +106,21 @@ namespace sgrep{
                 get_outs() const noexcept {
                     return this->outs_;
                 }
-                void set_opt(Option opt) {
+                void set_opt(ReadingPattern opt) {
                     opt_ = opt;
                 }
-                Option get_opt() {
+                ReadingPattern get_opt() {
                     return this->opt_;
                 }
+                std::string const& get_file_name() {
+                    return this->file_name_;
+                }
+                void set_file_name(std::string const& file_name) {
+                    this->file_name_ = file_name;
+                }
             private:
-                Option opt_ = Option::ByLine;
+                ReadingPattern opt_ = ReadingPattern::ByLine;
+                std::string file_name_;
                 std::reference_wrapper<std::istream> ins_ = std::cin;
                 std::reference_wrapper<std::ostream> outs_ = std::cout;
             };
@@ -215,8 +231,8 @@ namespace sgrep{
         }
         //sgrep
         bool read(std::string& block) {
-            using readOption = sgrep::Sgrep::Config::Ios::Option;
-            if (this->conf_.ios_.get_opt() == readOption::ByLine) {
+            using ReadingPattern = sgrep::Sgrep::Config::Ios::ReadingPattern;
+            if (this->conf_.ios_.get_opt() == ReadingPattern::ByLine) {
                 return static_cast<bool>(std::getline(this->conf_.ios_.get_ins().get(), block));           
             }
             return false;
